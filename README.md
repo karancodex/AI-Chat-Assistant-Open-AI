@@ -19,7 +19,7 @@ Whether you're creating a chatbot, virtual assistant, or AI help desk, this temp
 bash
 Copy
 Edit
-git clone https://github.com/your-username/ai-chat-assistant-nextjs.git
+git clone https://github.com/karancodex/AI-Chat-Assistant-Open-AI.git
 cd ai-chat-assistant-nextjs
 2. Install Dependencies
 bash
