@@ -18,10 +18,15 @@ import {
   Toolbar,
   Typography,
   createTheme,
-  ThemeProvider
+  ThemeProvider,
+  useMediaQuery,
+  Paper,
+  Divider
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import PaymentIcon from '@mui/icons-material/Payment';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 
 declare global {
   interface Window {
@@ -37,21 +42,14 @@ interface Message {
 }
 
 const STORAGE_KEY = 'chat_messages';
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-    background: {
-      default: '#f5f5f5',
-    },
-  },
-});
+
+const generateMessageId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
 
 function App() {
+  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+  const [darkMode, setDarkMode] = useState(prefersDarkMode);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>(() => {
     // Initialize messages from localStorage
@@ -79,6 +77,46 @@ function App() {
   const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const theme = React.useMemo(
+    () =>
+      createTheme({
+        palette: {
+          mode: darkMode ? 'dark' : 'light',
+          primary: {
+            main: darkMode ? '#90caf9' : '#1976d2',
+          },
+          secondary: {
+            main: darkMode ? '#f48fb1' : '#dc004e',
+          },
+          background: {
+            default: darkMode ? '#121212' : '#f5f5f5',
+            paper: darkMode ? '#1e1e1e' : '#ffffff',
+          },
+        },
+        components: {
+          MuiCard: {
+            styleOverrides: {
+              root: {
+                borderRadius: '12px',
+                boxShadow: darkMode ? '0 4px 6px rgba(0, 0, 0, 0.3)' : '0 4px 6px rgba(0, 0, 0, 0.1)',
+              },
+            },
+          },
+          MuiTextField: {
+            styleOverrides: {
+              root: {
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '24px',
+                  backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                },
+              },
+            },
+          },
+        },
+      }),
+    [darkMode],
+  );
+
   // Save messages to localStorage whenever they change
   useEffect(() => {
     try {
@@ -89,10 +127,6 @@ function App() {
       console.error('Error saving messages to localStorage:', error);
     }
   }, [messages]);
-
-  const generateMessageId = () => {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-  };
 
   useEffect(() => {
     const scriptUrl = "https://sdk.cashfree.com/js/v3/cashfree.js";
@@ -218,20 +252,28 @@ function App() {
     cashfree.checkout(checkoutOptions);
   };
 
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <AppBar position="static">
+      <Paper elevation={0} sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <AppBar position="static" color="default" elevation={1}>
           <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
               AI Chat Assistant
             </Typography>
+            <IconButton onClick={toggleDarkMode} color="inherit">
+              {darkMode ? <Brightness7Icon /> : <Brightness4Icon />}
+            </IconButton>
             <Button 
               color="inherit" 
               startIcon={<PaymentIcon />} 
               onClick={handlePayment}
               disabled={!cashfreeLoaded}
+              sx={{ ml: 2 }}
             >
               {cashfreeLoaded ? "Upgrade" : "Loading Payment..."}
             </Button>
@@ -244,11 +286,20 @@ function App() {
               {messages.map((message) => (
                 <ListItem key={message.id} sx={{
                   justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
-                  px: 0
+                  px: 0,
+                  py: 1
                 }}>
                   {message.role === 'assistant' && (
                     <ListItemAvatar>
-                      <Avatar sx={{ bgcolor: 'primary.main' }}>AI</Avatar>
+                      <Avatar 
+                        sx={{ 
+                          bgcolor: 'primary.main',
+                          width: 40,
+                          height: 40
+                        }}
+                      >
+                        AI
+                      </Avatar>
                     </ListItemAvatar>
                   )}
                   <Card sx={{
@@ -256,19 +307,41 @@ function App() {
                     maxWidth: '70%',
                     bgcolor: message.role === 'user' ? 'primary.main' : 'background.paper',
                     color: message.role === 'user' ? 'common.white' : 'text.primary',
-                    borderRadius: message.role === 'user' ? '18px 18px 0 18px' : '18px 18px 18px 0'
+                    borderRadius: message.role === 'user' ? '18px 18px 0 18px' : '18px 18px 18px 0',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                    }
                   }}>
                     <ListItemText 
                       primary={message.content} 
                       secondary={new Date(message.timestamp).toLocaleTimeString()}
                       primaryTypographyProps={{
-                        style: { whiteSpace: 'pre-wrap' }
+                        style: { 
+                          whiteSpace: 'pre-wrap',
+                          lineHeight: 1.5
+                        }
+                      }}
+                      secondaryTypographyProps={{
+                        style: {
+                          fontSize: '0.75rem',
+                          opacity: 0.7
+                        }
                       }}
                     />
                   </Card>
                   {message.role === 'user' && (
                     <ListItemAvatar>
-                      <Avatar sx={{ bgcolor: 'secondary.main' }}>U</Avatar>
+                      <Avatar 
+                        sx={{ 
+                          bgcolor: 'secondary.main',
+                          width: 40,
+                          height: 40
+                        }}
+                      >
+                        U
+                      </Avatar>
                     </ListItemAvatar>
                   )}
                 </ListItem>
@@ -288,7 +361,8 @@ function App() {
           </Container>
         </Box>
 
-        <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+        <Divider />
+        <Box sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Container maxWidth="md">
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <TextField
@@ -308,6 +382,16 @@ function App() {
                         color="primary"
                         onClick={handleSendMessage}
                         disabled={!input.trim() || loading}
+                        sx={{
+                          backgroundColor: 'primary.main',
+                          color: 'common.white',
+                          '&:hover': {
+                            backgroundColor: 'primary.dark',
+                          },
+                          '&:disabled': {
+                            backgroundColor: 'action.disabledBackground',
+                          }
+                        }}
                       >
                         <SendIcon />
                       </IconButton>
@@ -318,7 +402,7 @@ function App() {
             </Box>
           </Container>
         </Box>
-      </Box>
+      </Paper>
     </ThemeProvider>
   );
 }
