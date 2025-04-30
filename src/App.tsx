@@ -20,8 +20,8 @@ import {
   createTheme,
   ThemeProvider
 } from '@mui/material';
-// import SendIcon from '@mui/icons-material/Send';
-// import PaymentIcon from '@mui/icons-material/Payment';
+import SendIcon from '@mui/icons-material/Send';
+import PaymentIcon from '@mui/icons-material/Payment';
 
 declare global {
   interface Window {
@@ -30,10 +30,13 @@ declare global {
 }
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
+  timestamp: number;
 }
 
+const STORAGE_KEY = 'chat_messages';
 const theme = createTheme({
   palette: {
     primary: {
@@ -54,6 +57,47 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load messages from localStorage on component mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem(STORAGE_KEY);
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        setMessages(parsedMessages);
+      } catch (error) {
+        console.error('Error loading messages from localStorage:', error);
+        // If there's an error, start fresh
+        setMessages([{
+          id: generateMessageId(),
+          role: 'assistant',
+          content: 'Hello! How can I help you today?',
+          timestamp: Date.now()
+        }]);
+      }
+    } else {
+      // No saved messages, start with welcome message
+      setMessages([{
+        id: generateMessageId(),
+        role: 'assistant',
+        content: 'Hello! How can I help you today?',
+        timestamp: Date.now()
+      }]);
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch (error) {
+      console.error('Error saving messages to localStorage:', error);
+    }
+  }, [messages]);
+
+  const generateMessageId = () => {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  };
 
   useEffect(() => {
     const scriptUrl = "https://sdk.cashfree.com/js/v3/cashfree.js";
@@ -93,9 +137,6 @@ function App() {
       .catch((err) => {
         console.error("❌", err);
       });
-
-    // Add welcome message
-    setMessages([{ role: 'assistant', content: 'Hello! How can I help you today?' }]);
   }, []);
 
   useEffect(() => {
@@ -109,8 +150,13 @@ function App() {
   const handleSendMessage = async () => {
     if (!input.trim()) return;
 
-    const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const userMessage: Message = {
+      id: generateMessageId(),
+      role: 'user',
+      content: input,
+      timestamp: Date.now()
+    };
+    setMessages((prev: Message[]) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
 
@@ -119,7 +165,7 @@ function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer b3cbc1a562f24151861dd7df8dd1ab74"
+          "Authorization": `Bearer ${process.env.REACT_APP_AIML_API_KEY}`
         },
         body: JSON.stringify({
           model: "gpt-3.5-turbo",
@@ -130,20 +176,24 @@ function App() {
       const data = await response.json();
       if (data.choices && data.choices[0]?.message?.content) {
         const assistantMessage: Message = {
+          id: generateMessageId(),
           role: 'assistant',
-          content: data.choices[0].message.content
+          content: data.choices[0].message.content,
+          timestamp: Date.now()
         };
-        setMessages(prev => [...prev, assistantMessage]);
+        setMessages((prev: Message[]) => [...prev, assistantMessage]);
       } else {
         throw new Error("No response from AI");
       }
     } catch (error) {
       console.error("Error:", error);
       const errorMessage: Message = {
+        id: generateMessageId(),
         role: 'assistant',
-        content: "Sorry, I encountered an error. Please try again."
+        content: "Sorry, I encountered an error. Please try again.",
+        timestamp: Date.now()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev: Message[]) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
@@ -162,12 +212,12 @@ function App() {
       return;
     }
 
-    const cashfree = new window.Cashfree({ mode: "sandbox" });
+    const cashfree = new window.Cashfree({ mode: process.env.REACT_APP_CASHFREE_MODE || "sandbox" });
 
     const checkoutOptions = {
-      paymentSessionId: "session_NTdVduz3Hw4BBNMoKSwi73ecOffygM6_a8oK3MkJgXSkCDZsxQflIDBk1fb36oHVzGPn629erVrICcKh4nB8CDaScM7XurubjOXX7x04m",
+      paymentSessionId: process.env.REACT_APP_CASHFREE_PAYMENT_SESSION_ID,
       redirectTarget: "_self",
-      returnUrl: "http://localhost:5000/api/status/{order_id}",
+      returnUrl: process.env.REACT_APP_CASHFREE_RETURN_URL,
     };
 
     cashfree.checkout(checkoutOptions);
@@ -184,7 +234,7 @@ function App() {
             </Typography>
             <Button 
               color="inherit" 
-              // startIcon={<PaymentIcon />} 
+              startIcon={<PaymentIcon />} 
               onClick={handlePayment}
               disabled={!cashfreeLoaded}
             >
@@ -196,8 +246,8 @@ function App() {
         <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2, bgcolor: 'background.default' }}>
           <Container maxWidth="md">
             <List sx={{ width: '100%' }}>
-              {messages.map((message, index) => (
-                <ListItem key={index} sx={{
+              {messages.map((message) => (
+                <ListItem key={message.id} sx={{
                   justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
                   px: 0
                 }}>
@@ -215,6 +265,7 @@ function App() {
                   }}>
                     <ListItemText 
                       primary={message.content} 
+                      secondary={new Date(message.timestamp).toLocaleTimeString()}
                       primaryTypographyProps={{
                         style: { whiteSpace: 'pre-wrap' }
                       }}
@@ -263,8 +314,7 @@ function App() {
                         onClick={handleSendMessage}
                         disabled={!input.trim() || loading}
                       >
-                        {/* <SendIcon /> */}
-                        <p>Send</p>
+                        <SendIcon />
                       </IconButton>
                     </InputAdornment>
                   ),
