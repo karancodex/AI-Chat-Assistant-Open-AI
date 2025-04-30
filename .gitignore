@@ -17,8 +17,24 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.env
+.env.*
 
+# logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# except .env.example
+!.env.example
+
 .qodo
