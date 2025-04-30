@@ -53,43 +53,38 @@ const theme = createTheme({
 
 function App() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    // Initialize messages from localStorage
+    try {
+      const savedMessages = localStorage.getItem(STORAGE_KEY);
+      if (savedMessages) {
+        const parsedMessages = JSON.parse(savedMessages);
+        // Validate the parsed messages
+        if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
+          return parsedMessages;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading messages from localStorage:', error);
+    }
+    // Return default welcome message if no valid messages found
+    return [{
+      id: generateMessageId(),
+      role: 'assistant',
+      content: 'Hello! How can I help you today?',
+      timestamp: Date.now()
+    }];
+  });
   const [loading, setLoading] = useState(false);
   const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load messages from localStorage on component mount
-  useEffect(() => {
-    const savedMessages = localStorage.getItem(STORAGE_KEY);
-    if (savedMessages) {
-      try {
-        const parsedMessages = JSON.parse(savedMessages);
-        setMessages(parsedMessages);
-      } catch (error) {
-        console.error('Error loading messages from localStorage:', error);
-        // If there's an error, start fresh
-        setMessages([{
-          id: generateMessageId(),
-          role: 'assistant',
-          content: 'Hello! How can I help you today?',
-          timestamp: Date.now()
-        }]);
-      }
-    } else {
-      // No saved messages, start with welcome message
-      setMessages([{
-        id: generateMessageId(),
-        role: 'assistant',
-        content: 'Hello! How can I help you today?',
-        timestamp: Date.now()
-      }]);
-    }
-  }, []);
-
   // Save messages to localStorage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      if (messages.length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      }
     } catch (error) {
       console.error('Error saving messages to localStorage:', error);
     }
